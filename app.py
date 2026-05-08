@@ -64,11 +64,17 @@ def login_user(username, password):
 
 def signup_user(username, password):
     try:
+        # User check karne ke liye
         check = supabase.table("users").select("*").eq("username", username).execute()
-        if len(check.data) > 0: return False
-        supabase.table("users").insert({"username": username, "password": password}).execute()
+        if len(check.data) > 0: 
+            return False
+        
+        # Insert karne ke liye
+        res = supabase.table("users").insert({"username": username, "password": password}).execute()
         return True
-    except:
+    except Exception as e:
+        # Ye line aapko batayegi ki asli error kya hai
+        st.sidebar.error(f"Database Error: {e}")
         return False
 
 # --- 6. USER INTERFACE ---
