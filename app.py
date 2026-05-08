@@ -3,131 +3,156 @@ from PIL import Image
 import datetime
 from supabase import create_client, Client
 
-# --- SUPABASE CONNECTION SETUP ---
-# Ye wahi details hain jo humne setup ki thi
-URL = "https://shqcptzsxfvfoinjchwv.supabase.co"
-KEY = "sb_publishable_aJJXzqC-ucvDDBZygeDddw_hAsGWN_K"
-supabase: Client = create_client(URL, KEY)
+# --- PAGE CONFIG ---
+st.set_page_config(
+    page_title="KernelSocial Bihar", 
+    page_icon="📸", 
+    layout="centered"
+)
 
-# Page Configuration
-st.set_page_config(page_title="KernelSocial Bihar", page_icon="🌾", layout="centered")
-
-# Custom CSS for Instagram-like feel
+# --- CUSTOM CSS FOR ATTRACTIVE UI ---
 st.markdown("""
     <style>
-    .stButton>button { width: 100%; border-radius: 20px; background-color: #008080; color: white; }
-    .main { background-color: #fafafa; }
+    /* Main background */
+    .stApp {
+        background-color: #f8f9fa;
+    }
+    /* Post card style */
+    .post-card {
+        background-color: white;
+        padding: 20px;
+        border-radius: 15px;
+        box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        margin-bottom: 25px;
+        border: 1px solid #eee;
+    }
+    /* Buttons */
+    .stButton>button {
+        width: 100%;
+        border-radius: 25px;
+        height: 3em;
+        background-color: #008080;
+        color: white;
+        font-weight: bold;
+        border: none;
+        transition: 0.3s;
+    }
+    .stButton>button:hover {
+        background-color: #006666;
+        border: none;
+    }
+    /* Sidebar styling */
+    section[data-testid="stSidebar"] {
+        background-color: #ffffff;
+        border-right: 1px solid #eee;
+    }
+    h1, h2, h3 {
+        color: #1a1a1a;
+        font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    }
     </style>
     """, unsafe_allow_html=True)
 
-# Session States to track login
+# --- SUPABASE CONNECTION ---
+# Streamlit Secrets se data uthayega
+try:
+    URL = st.secrets["https://shqcptzsxfvfoinjchwv.supabase.co"]
+    KEY = st.secrets["sb_publishable_aJJXzqC-ucvDDBZygeDddw_hAsGWN_K"]
+    supabase: Client = create_client(URL, KEY)
+except Exception as e:
+    st.error("Secrets not configured correctly in Streamlit Cloud!")
+
+# --- SESSION STATES ---
 if 'logged_in' not in st.session_state:
     st.session_state.logged_in = False
 if 'current_user' not in st.session_state:
     st.session_state.current_user = None
 
-# --- DATABASE FUNCTIONS ---
+# --- APP LOGIC ---
 def login_user(username, password):
-    try:
-        res = supabase.table("users").select("*").eq("username", username).eq("password", password).execute()
-        return len(res.data) > 0
-    except Exception as e:
-        st.error(f"Login Error: {e}")
-        return False
+    res = supabase.table("users").select("*").eq("username", username).eq("password", password).execute()
+    return len(res.data) > 0
 
 def signup_user(username, password):
-    try:
-        # Check if user already exists
-        check = supabase.table("users").select("*").eq("username", username).execute()
-        if len(check.data) > 0:
-            return "exists"
-        
-        # Insert new user
-        supabase.table("users").insert({"username": username, "password": password}).execute()
-        return "success"
-    except Exception as e:
-        return str(e)
+    check = supabase.table("users").select("*").eq("username", username).execute()
+    if len(check.data) > 0: return False
+    supabase.table("users").insert({"username": username, "password": password}).execute()
+    return True
 
-# --- USER INTERFACE (UI) ---
+# --- UI RENDERING ---
 
 if not st.session_state.logged_in:
-    # --- LOGIN / SIGNUP SCREEN ---
-    st.title("🌾 KernelSocial Bihar")
-    st.subheader("Bihar ka apna safe social platform")
+    # --- LOGIN / SIGNUP PAGE ---
+    st.image("https://img.icons8.com/clouds/200/000000/instagram-new.png", width=100)
+    st.title("KernelSocial Bihar")
+    st.markdown("##### Clean Content. Safe Community.")
     
-    choice = st.radio("Choose Action", ["Login", "Sign Up"], horizontal=True)
-
-    if choice == "Login":
-        u_name = st.text_input("Username")
-        u_pass = st.text_input("Password", type="password")
-        if st.button("Log In"):
+    tab1, tab2 = st.tabs(["🔒 Login", "📝 Sign Up"])
+    
+    with tab1:
+        u_name = st.text_input("Username", placeholder="Enter your username")
+        u_pass = st.text_input("Password", type="password", placeholder="Enter your password")
+        if st.button("Login"):
             if login_user(u_name, u_pass):
                 st.session_state.logged_in = True
                 st.session_state.current_user = u_name
-                st.success(f"Welcome back, {u_name}!")
                 st.rerun()
             else:
-                st.error("Invalid Username or Password")
+                st.error("Oops! Galat details hain.")
 
-    else:
-        new_u = st.text_input("Choose a Username")
-        new_p = st.text_input("Choose a Password", type="password")
-        if st.button("Create My Account"):
-            if new_u and new_p:
-                status = signup_user(new_u, new_p)
-                if status == "success":
-                    st.success("Account ban gaya! Ab aap Login kar sakte hain.")
-                elif status == "exists":
-                    st.warning("Ye username pehle se kisi ne le liya hai.")
+    with tab2:
+        n_user = st.text_input("Choose Username", placeholder="Unique name rakhein")
+        n_pass = st.text_input("Choose Password", type="password", placeholder="Strong password rakhein")
+        if st.button("Create Account"):
+            if n_user and n_pass:
+                if signup_user(n_user, n_pass):
+                    st.success("Account ban gaya! Ab Login tab par jayein.")
                 else:
-                    st.error(f"Error: {status}")
+                    st.warning("Ye naam pehle se hai.")
             else:
-                st.warning("Please fill all fields")
+                st.error("Sabhi fields bharein.")
 
 else:
-    # --- MAIN APP (AFTER LOGIN) ---
-    st.sidebar.title(f"👤 {st.session_state.current_user}")
-    if st.sidebar.button("Logout"):
-        st.session_state.logged_in = False
-        st.session_state.current_user = None
-        st.rerun()
-
-    # Post Upload Section
-    st.sidebar.divider()
-    st.sidebar.header("📤 Naya Post Dalein")
-    uploaded_file = st.sidebar.file_uploader("Select Photo", type=['jpg', 'png', 'jpeg'])
-    
-    if uploaded_file:
-        img = Image.open(uploaded_file)
-        st.sidebar.image(img, caption="Preview", use_container_width=True)
-        cap = st.sidebar.text_area("Caption likhein (Strictly No Vulgarity)")
+    # --- LOGGED IN: FEED & UPLOAD ---
+    # Sidebar
+    with st.sidebar:
+        st.markdown(f"### 👋 Namaste, {st.session_state.current_user}")
+        if st.button("Logout"):
+            st.session_state.logged_in = False
+            st.rerun()
         
-        if st.sidebar.button("Post to Feed"):
-            # Yahan hum temporary post dikhayenge (Permanent ke liye Supabase Storage chahiye hoga)
-            if 'temp_posts' not in st.session_state:
-                st.session_state.temp_posts = []
-            
-            post_data = {
-                "user": st.session_state.current_user,
-                "image": img,
-                "caption": cap,
-                "time": datetime.datetime.now().strftime("%d %b, %H:%M")
-            }
-            st.session_state.temp_posts.insert(0, post_data)
-            st.sidebar.success("Aapka post live hai!")
+        st.divider()
+        st.header("📸 New Post")
+        up_file = st.file_uploader("Choose a photo", type=['jpg','png','jpeg'])
+        if up_file:
+            img = Image.open(up_file)
+            st.image(img, caption="Preview", use_container_width=True)
+            cap = st.text_area("Write caption...")
+            if st.button("Publish Now"):
+                # Temporary feed update
+                if 'feed' not in st.session_state: st.session_state.feed = []
+                st.session_state.feed.insert(0, {
+                    "user": st.session_state.current_user,
+                    "img": img,
+                    "cap": cap,
+                    "time": datetime.datetime.now().strftime("%I:%M %p")
+                })
+                st.success("Post Live ho gaya!")
 
-    # --- MAIN FEED ---
-    st.title("📸 Social Feed")
-    st.write(f"Namaste **{st.session_state.current_user}**! Dekhiye Bihar mein kya naya hai.")
-    st.divider()
-
-    if 'temp_posts' not in st.session_state or not st.session_state.temp_posts:
-        st.info("Abhi feed khali hai. Kuch accha post karke shuruat karein!")
+    # Main Feed UI
+    st.title("📸 Feed")
+    
+    if 'feed' not in st.session_state or not st.session_state.feed:
+        st.info("Abhi tak yahan kuch nahi hai. Pehle insaan baniye jo post karein!")
     else:
-        for post in st.session_state.temp_posts:
-            with st.container():
-                st.markdown(f"### 👤 {post['user']}")
-                st.image(post['image'], use_container_width=True)
-                st.write(f"**{post['user']}**: {post['caption']}")
-                st.caption(f"📅 {post['time']}")
-                st.divider()
+        for post in st.session_state.feed:
+            # HTML for nice Card Look
+            st.markdown(f"""
+                <div class="post-card">
+                    <p style='font-weight: bold; font-size: 1.1em;'>👤 {post['user']}</p>
+                </div>
+            """, unsafe_allow_html=True)
+            st.image(post['img'], use_container_width=True)
+            st.markdown(f"**{post['user']}**: {post['cap']}")
+            st.caption(f"🕒 Posted at {post['time']}")
+            st.markdown("<br>", unsafe_allow_html=True)
