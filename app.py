@@ -56,8 +56,8 @@ st.markdown("""
 # --- SUPABASE CONNECTION ---
 # Streamlit Secrets se data uthayega
 try:
-    URL = st.secrets["https://shqcptzsxfvfoinjchwv.supabase.co"]
-    KEY = st.secrets["sb_publishable_aJJXzqC-ucvDDBZygeDddw_hAsGWN_K"]
+    URL = st.secrets["SUPABASE_URL"]
+    KEY = st.secrets["SUPABASE_KEY"]
     supabase: Client = create_client(URL, KEY)
 except Exception as e:
     st.error("Secrets not configured correctly in Streamlit Cloud!")
