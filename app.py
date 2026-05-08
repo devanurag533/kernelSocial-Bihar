@@ -1,87 +1,133 @@
 import streamlit as st
 from PIL import Image
 import datetime
+from supabase import create_client, Client
 
-# Page Settings
-st.set_page_config(page_title="KernelSocial Bihar", page_icon="🌾")
+# --- SUPABASE CONNECTION SETUP ---
+# Ye wahi details hain jo humne setup ki thi
+URL = "https://shqcptzsxfvfoinjchwv.supabase.co"
+KEY = "sb_publishable_aJJXzqC-ucvDDBZygeDddw_hAsGWN_K"
+supabase: Client = create_client(URL, KEY)
 
-# --- DATABASE SIMULATION (Abhi ke liye temporary) ---
-if 'user_db' not in st.session_state:
-    st.session_state.user_db = {} # Format: {username: password}
+# Page Configuration
+st.set_page_config(page_title="KernelSocial Bihar", page_icon="🌾", layout="centered")
+
+# Custom CSS for Instagram-like feel
+st.markdown("""
+    <style>
+    .stButton>button { width: 100%; border-radius: 20px; background-color: #008080; color: white; }
+    .main { background-color: #fafafa; }
+    </style>
+    """, unsafe_allow_html=True)
+
+# Session States to track login
 if 'logged_in' not in st.session_state:
     st.session_state.logged_in = False
 if 'current_user' not in st.session_state:
     st.session_state.current_user = None
 
-# --- LOGIN / SIGNUP LOGIC ---
-def login_page():
-    st.title("🔐 Welcome to KernelSocial")
-    tab1, tab2 = st.tabs(["Login", "Sign Up"])
+# --- DATABASE FUNCTIONS ---
+def login_user(username, password):
+    try:
+        res = supabase.table("users").select("*").eq("username", username).eq("password", password).execute()
+        return len(res.data) > 0
+    except Exception as e:
+        st.error(f"Login Error: {e}")
+        return False
 
-    with tab1:
-        u_name = st.text_input("Username", key="login_user")
-        u_pass = st.text_input("Password", type="password", key="login_pass")
-        if st.button("Login"):
-            if u_name in st.session_state.user_db and st.session_state.user_db[u_name] == u_pass:
+def signup_user(username, password):
+    try:
+        # Check if user already exists
+        check = supabase.table("users").select("*").eq("username", username).execute()
+        if len(check.data) > 0:
+            return "exists"
+        
+        # Insert new user
+        supabase.table("users").insert({"username": username, "password": password}).execute()
+        return "success"
+    except Exception as e:
+        return str(e)
+
+# --- USER INTERFACE (UI) ---
+
+if not st.session_state.logged_in:
+    # --- LOGIN / SIGNUP SCREEN ---
+    st.title("🌾 KernelSocial Bihar")
+    st.subheader("Bihar ka apna safe social platform")
+    
+    choice = st.radio("Choose Action", ["Login", "Sign Up"], horizontal=True)
+
+    if choice == "Login":
+        u_name = st.text_input("Username")
+        u_pass = st.text_input("Password", type="password")
+        if st.button("Log In"):
+            if login_user(u_name, u_pass):
                 st.session_state.logged_in = True
                 st.session_state.current_user = u_name
+                st.success(f"Welcome back, {u_name}!")
                 st.rerun()
             else:
                 st.error("Invalid Username or Password")
 
-    with tab2:
-        new_u_name = st.text_input("Choose Username", key="reg_user")
-        new_u_pass = st.text_input("Choose Password", type="password", key="reg_pass")
-        if st.button("Create Account"):
-            if new_u_name in st.session_state.user_db:
-                st.warning("User already exists!")
-            elif new_u_name == "" or new_u_pass == "":
-                st.error("Fields cannot be empty")
+    else:
+        new_u = st.text_input("Choose a Username")
+        new_p = st.text_input("Choose a Password", type="password")
+        if st.button("Create My Account"):
+            if new_u and new_p:
+                status = signup_user(new_u, new_p)
+                if status == "success":
+                    st.success("Account ban gaya! Ab aap Login kar sakte hain.")
+                elif status == "exists":
+                    st.warning("Ye username pehle se kisi ne le liya hai.")
+                else:
+                    st.error(f"Error: {status}")
             else:
-                st.session_state.user_db[new_u_name] = new_u_pass
-                st.success("Account created! Please Login.")
+                st.warning("Please fill all fields")
 
-# --- MAIN APP ---
-if not st.session_state.logged_in:
-    login_page()
 else:
-    # Sidebar with Logout
-    st.sidebar.title(f"👋 Hello, {st.session_state.current_user}")
+    # --- MAIN APP (AFTER LOGIN) ---
+    st.sidebar.title(f"👤 {st.session_state.current_user}")
     if st.sidebar.button("Logout"):
         st.session_state.logged_in = False
+        st.session_state.current_user = None
         st.rerun()
 
-    # --- UPLOAD SECTION ---
-    st.sidebar.header("📤 Naya Post")
-    uploaded_file = st.sidebar.file_uploader("Photo select karein", type=['jpg', 'png', 'jpeg'])
-
+    # Post Upload Section
+    st.sidebar.divider()
+    st.sidebar.header("📤 Naya Post Dalein")
+    uploaded_file = st.sidebar.file_uploader("Select Photo", type=['jpg', 'png', 'jpeg'])
+    
     if uploaded_file:
         img = Image.open(uploaded_file)
         st.sidebar.image(img, caption="Preview", use_container_width=True)
-        cap = st.sidebar.text_area("Caption likhein...")
-        if st.sidebar.button("Post Karein"):
-            if 'posts' not in st.session_state:
-                st.session_state.posts = []
+        cap = st.sidebar.text_area("Caption likhein (Strictly No Vulgarity)")
+        
+        if st.sidebar.button("Post to Feed"):
+            # Yahan hum temporary post dikhayenge (Permanent ke liye Supabase Storage chahiye hoga)
+            if 'temp_posts' not in st.session_state:
+                st.session_state.temp_posts = []
             
-            data = {
+            post_data = {
                 "user": st.session_state.current_user,
-                "img": img, 
-                "cap": cap, 
-                "date": datetime.datetime.now().strftime("%d %b, %H:%M")
+                "image": img,
+                "caption": cap,
+                "time": datetime.datetime.now().strftime("%d %b, %H:%M")
             }
-            st.session_state.posts.insert(0, data)
-            st.success("Post live ho gaya!")
+            st.session_state.temp_posts.insert(0, post_data)
+            st.sidebar.success("Aapka post live hai!")
 
-    # --- FEED ---
-    st.title("🌾 KernelSocial Bihar")
-    st.write("---")
-    if 'posts' not in st.session_state or not st.session_state.posts:
-        st.info("Feed khali hai. Kuch post karein!")
+    # --- MAIN FEED ---
+    st.title("📸 Social Feed")
+    st.write(f"Namaste **{st.session_state.current_user}**! Dekhiye Bihar mein kya naya hai.")
+    st.divider()
+
+    if 'temp_posts' not in st.session_state or not st.session_state.temp_posts:
+        st.info("Abhi feed khali hai. Kuch accha post karke shuruat karein!")
     else:
-        for p in st.session_state.posts:
+        for post in st.session_state.temp_posts:
             with st.container():
-                st.write(f"👤 **{p['user']}**")
-                st.image(p['img'], use_container_width=True)
-                st.write(f"{p['cap']}")
-                st.caption(f"📅 {p['date']}")
-                st.write("---")
+                st.markdown(f"### 👤 {post['user']}")
+                st.image(post['image'], use_container_width=True)
+                st.write(f"**{post['user']}**: {post['caption']}")
+                st.caption(f"📅 {post['time']}")
+                st.divider()
